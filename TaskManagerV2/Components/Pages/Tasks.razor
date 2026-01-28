@@ -1,0 +1,149 @@
+﻿@page "/tasks"
+@rendermode InteractiveServer
+@inject TaskManagerV2.Core.Interfaces.ITaskRepository Repo
+
+@* <h3>Task Manager</h3> *@
+
+<div class="mb-3">
+    <input class="form-control mb-2"
+           placeholder="Tytuł zadania"
+           @bind="newTitle" />
+
+    <textarea class="form-control mb-2"
+              placeholder="Opis zadania (opcjonalnie)"
+              @bind="newDescription"></textarea>
+
+    <button class="btn btn-primary" @onclick="AddTask">
+        Dodaj zadanie
+    </button>
+</div>
+
+<hr />
+
+<h4>Lista zadań</h4>
+
+@if (!tasks.Any())
+{
+    <p><em>Brak zadań</em></p>
+}
+else
+{
+    <ul class="list-group">
+        @foreach (var task in tasks)
+        {
+            <li class="list-group-item">
+                <strong>@task.Title</strong>
+
+                @if (!string.IsNullOrWhiteSpace(task.Description))
+                {
+                    <p class="mb-1">@task.Description</p>
+                }
+
+                <small>
+                    Utworzono: @task.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                </small>
+
+                @if (task.CompletedAt != null)
+                {
+                    <br />
+                    <small>
+                        Wykonano: @task.CompletedAt.Value.ToString("yyyy-MM-dd HH:mm")
+                    </small>
+                }
+
+                <div class="mt-2">
+                    @if (task.IsDone)
+                    {
+                        <span class="badge bg-success me-2">Wykonane</span>
+                        <button class="btn btn-sm btn-warning"
+                                @onclick="() => Reopen(task.Id)">
+                            Cofnij
+                        </button>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary me-2">Otwarte</span>
+                        <button class="btn btn-sm btn-success"
+                                @onclick="() => MarkDone(task.Id)">
+                            Zrób
+                        </button>
+                    }
+
+                    <button class="btn btn-sm btn-danger ms-2"
+                            @onclick="() => Delete(task.Id)">
+                        Usuń
+                    </button>
+                </div>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private List<TaskManagerV2.Core.Entities.TaskItem> tasks = new();
+    private string newTitle = string.Empty;
+    private string? newDescription;
+
+    protected override void OnInitialized()
+    {
+        LoadTasks();
+    }
+
+    void LoadTasks()
+    {
+        tasks = Repo.GetAll()
+                    .OrderByDescending(t => t.CreatedAt)
+                    .ToList();
+    }
+
+    void AddTask()
+    {
+        if (string.IsNullOrWhiteSpace(newTitle))
+            return;
+
+        var task = new TaskManagerV2.Core.Entities.TaskItem(
+            newTitle,
+            newDescription
+        );
+
+        Repo.Add(task);
+        Repo.Save();
+
+        newTitle = "";
+        newDescription = null;
+
+        LoadTasks();
+    }
+
+    void MarkDone(int id)
+    {
+        var task = Repo.GetById(id);
+        if (task == null) return;
+
+        task.MarkDone();
+        Repo.Update(task);
+        Repo.Save();
+
+        LoadTasks();
+    }
+
+    void Reopen(int id)
+    {
+        var task = Repo.GetById(id);
+        if (task == null) return;
+
+        task.Reopen();
+        Repo.Update(task);
+        Repo.Save();
+
+        LoadTasks();
+    }
+
+    void Delete(int id)
+    {
+        Repo.Delete(id);
+        Repo.Save();
+
+        LoadTasks();
+    }
+}
